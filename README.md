@@ -5,7 +5,18 @@ Useful to test http endpoints.
 
 
 ![](img/sequence.png)
-Diagram produed at https://www.websequencediagrams.com/ - code: 
+
+
+
+Configuration:
+config file (default is $HOME/.proxy-sink.yaml)
+```
+
+```
+
+
+
+Sequence Diagrams produced at https://www.websequencediagrams.com/ - code: 
 ```
 title Proxy-Sink
 
