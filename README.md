@@ -37,8 +37,9 @@ Build:
 docker build -t proxy-sink .
 ```
 
-Linux build from windows machine:
+Linux build from windows (or any) machine:
 ```
+docker run --rm -v "$PWD":/usr/src/proxy-sink -w /usr/src/proxy-sink golang:1.12 go build -v
 
 ```
 
