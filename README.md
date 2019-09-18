@@ -37,6 +37,11 @@ Build:
 docker build -t proxy-sink .
 ```
 
+Linux build from windows machine:
+```
+
+```
+
 Run :
 ```
 docker run -it --rm proxy-sink proxy-sink start
