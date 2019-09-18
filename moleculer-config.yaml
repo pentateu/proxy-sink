@@ -1,6 +1,4 @@
-log: error
-
-crazykey: crazy value
+log: debug
 
 services:
   proxy-sink:
