@@ -37,6 +37,11 @@ Build:
 docker build -t proxy-sink .
 ```
 
+Run :
+```
+docker run -it --rm proxy-sink proxy-sink start
+```
+
 
 Sequence Diagrams produced at https://www.websequencediagrams.com/ - code: 
 ```

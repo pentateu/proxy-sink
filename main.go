@@ -119,7 +119,7 @@ var proxySink = moleculer.ServiceSchema{
 			}
 		})
 		go http.ListenAndServe(":"+strconv.Itoa(port), nil)
-		c.Logger().Info("Proxy Sink started - listening on port: "+port+" mode: ", mode, " correlationId Header: ", correlationIdHeader)
+		c.Logger().Info("Proxy Sink started - listening on port: "+strconv.Itoa(port)+" mode: ", mode, " correlationId Header: ", correlationIdHeader)
 	},
 }
 
