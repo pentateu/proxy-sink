@@ -1,12 +1,9 @@
 FROM golang:1.12
 
-WORKDIR /go/src/proxy-sink
+WORKDIR /go/bin
 
-COPY . .
-
-RUN go get -d -v ./...
-
-RUN go install -v ./...
+COPY ./proxy-sink .
+COPY ./moleculer-config.yaml .
 
 CMD ["proxy-sink start"]
 
