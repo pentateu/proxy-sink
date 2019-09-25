@@ -91,6 +91,8 @@ func respondWithMock(w http.ResponseWriter, mockFolder, pathKey string) {
 
 // sinkAndMockResponse store the incoming request and reponse with a mock response
 func sinkAndMockResponse(c moleculer.BrokerContext, w http.ResponseWriter, r *http.Request, correlationID, mockFolder string) {
+	c.Logger().Debug("sinkAndMockResponse() - correlationID ", correlationID)
+
 	payload, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		payload = []byte("Error reading body. Error: " + err.Error())
