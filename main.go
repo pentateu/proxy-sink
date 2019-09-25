@@ -1,7 +1,10 @@
 package main
 
 import (
+	"io"
 	"io/ioutil"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
@@ -89,14 +92,43 @@ func respondWithMock(w http.ResponseWriter, mockFolder, pathKey string) {
 	w.Write(contents)
 }
 
-// sinkAndMockResponse store the incoming request and reponse with a mock response
-func sinkAndMockResponse(c moleculer.BrokerContext, w http.ResponseWriter, r *http.Request, correlationID, mockFolder string) {
-	c.Logger().Debug("sinkAndMockResponse() - correlationID ", correlationID)
-
+func extractPayload(c moleculer.BrokerContext, r *http.Request) []byte {
+	ct := r.Header.Get("Content-Type")
+	if ct != "" {
+		mediaType, params, err := mime.ParseMediaType(ct)
+		if err != nil {
+			return []byte("Error parsing media type. Error: " + err.Error())
+		}
+		if strings.HasPrefix(mediaType, "multipart/") {
+			mr := multipart.NewReader(r.Body, params["boundary"])
+			for {
+				p, err := mr.NextPart()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					c.Logger().Error("extractPayload() - Error getting multi-part - error: ", err)
+				}
+				payload, err := ioutil.ReadAll(p)
+				if err != nil {
+					payload = []byte("Error reading body. Error: " + err.Error())
+				}
+				return payload
+			}
+		}
+	}
 	payload, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		payload = []byte("Error reading body. Error: " + err.Error())
 	}
+	return payload
+}
+
+// sinkAndMockResponse store the incoming request and reponse with a mock response
+func sinkAndMockResponse(c moleculer.BrokerContext, w http.ResponseWriter, r *http.Request, correlationID, mockFolder string) {
+	c.Logger().Debug("sinkAndMockResponse() - correlationID ", correlationID)
+
+	payload := extractPayload(c, r)
 	path := r.URL.Path
 	headers := r.Header
 
