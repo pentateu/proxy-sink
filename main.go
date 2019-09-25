@@ -13,6 +13,7 @@ import (
 	"github.com/moleculer-go/moleculer"
 	"github.com/moleculer-go/moleculer/broker"
 	"github.com/moleculer-go/moleculer/cli"
+	"github.com/moleculer-go/moleculer/payload"
 	"github.com/moleculer-go/store"
 	"github.com/spf13/cobra"
 )
@@ -53,10 +54,22 @@ var sink = moleculer.ServiceSchema{
 	})},
 }
 
-func getCorrelationID(headerField string, r *http.Request) string {
+func getCorrelationID(c moleculer.BrokerContext, headerField string, r *http.Request) string {
+
+	c.Logger().Debug("getCorrelationID() - headerField ", headerField)
+
 	correlationID := r.Header[headerField]
 	if len(correlationID) > 0 && correlationID[0] != "" {
+		c.Logger().Debug("correlation id found: ", correlationID[0])
 		return correlationID[0]
+	}
+
+	for name, value := range r.Header {
+		c.Logger().Debug("header ", name, " value: ", value)
+		if strings.Contains(strings.ToLower(name), "correlation") {
+			c.Logger().Debug("correlation id found: ", value[0])
+			return value[0]
+		}
 	}
 	return "not-found"
 }
@@ -106,11 +119,12 @@ func sinkAndProxy(c moleculer.BrokerContext, w http.ResponseWriter, r *http.Requ
 var proxySink = moleculer.ServiceSchema{
 	Name: "proxy-sink",
 	Started: func(c moleculer.BrokerContext, svc moleculer.ServiceSchema) {
-		mode := svc.Settings["mode"].(string)
-		port := svc.Settings["port"].(int)
-		correlationIdHeader := svc.Settings["correlation-header"].(string)
+		settings := payload.New(svc.Settings)
+		mode := settings.Get("mode").String()
+		port := settings.Get("port").Int()
+		correlationIdHeader := settings.Get("correlation-header").String()
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			correlationID := getCorrelationID(correlationIdHeader, r)
+			correlationID := getCorrelationID(c, correlationIdHeader, r)
 			if mode == "sink" {
 				mocks := svc.Settings["mocks"].(string)
 				sinkAndMockResponse(c, w, r, correlationID, mocks)
