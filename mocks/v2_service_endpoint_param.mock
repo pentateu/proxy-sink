@@ -1,1 +1,4 @@
-mock content!
+{
+    "statusCode": 200,
+    "content": "mock content!"
+}

@@ -1,5 +1,5 @@
 # proxy-sink
-Reverse proxy with data sink on a Redis database.
+Reverse proxy with data sink on a SQLite database.
 
 Useful to test http endpoints.
 
@@ -28,6 +28,19 @@ services:
   api:
     settings:
       port: "3120"
+
+```
+
+Mocks:
+The proxy sink will return a standard response with status 200 if you don't provide a mock file.
+If you provide a mock file, the status code and content from the mock file will be returned to the service calling the proxy sink.
+
+```
+# Example Mock File
+{
+    "statusCode": 200,
+    "content": "mock content!"
+}
 
 ```
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"io/ioutil"
 	"mime"
@@ -57,6 +58,11 @@ var sink = moleculer.ServiceSchema{
 	})},
 }
 
+type MockContent struct {
+	StatuCode int
+	Content   string
+}
+
 func getCorrelationID(c moleculer.BrokerContext, headerField string, r *http.Request) string {
 
 	c.Logger().Debug("getCorrelationID() - headerField ", headerField)
@@ -85,11 +91,18 @@ func pathKey(path string) string {
 
 func respondWithMock(w http.ResponseWriter, mockFolder, pathKey string) {
 	path := mockFolder + "/" + pathKey
-	contents, err := ioutil.ReadFile(path)
-	if err != nil {
-		contents = []byte("Error reading file from : " + path + ". Error: " + err.Error())
+	mock := MockContent{StatuCode: 200, Content: ""}
+	fileContents, err := ioutil.ReadFile(path)
+	if err == nil {
+		err = json.Unmarshal(fileContents, &mock)
+		if err != nil {
+			mock.Content = "Error reading JSON mock file: " + path + ". Details: " + err.Error()
+		}
+	} else {
+		mock.Content = "Warning! Proxy Sink could not find the mock configuration file from : " + path + ". Details: " + err.Error()
 	}
-	w.Write(contents)
+	w.WriteHeader(mock.StatuCode)
+	w.Write([]byte(mock.Content))
 }
 
 func extractPayload(c moleculer.BrokerContext, r *http.Request) []byte {
