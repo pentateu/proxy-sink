@@ -59,8 +59,8 @@ var sink = moleculer.ServiceSchema{
 }
 
 type MockContent struct {
-	StatuCode int
-	Content   string
+	StatusCode int
+	Content    string
 }
 
 func getCorrelationID(c moleculer.BrokerContext, headerField string, r *http.Request) string {
@@ -89,19 +89,21 @@ func pathKey(path string) string {
 	return name
 }
 
-func respondWithMock(w http.ResponseWriter, mockFolder, pathKey string) {
+func respondWithMock(c moleculer.BrokerContext, w http.ResponseWriter, mockFolder, pathKey string) {
 	path := mockFolder + "/" + pathKey
-	mock := MockContent{StatuCode: 200, Content: ""}
+	mock := MockContent{StatusCode: 200, Content: "empty!"}
 	fileContents, err := ioutil.ReadFile(path)
 	if err == nil {
 		err = json.Unmarshal(fileContents, &mock)
 		if err != nil {
 			mock.Content = "Error reading JSON mock file: " + path + ". Details: " + err.Error()
+		} else {
+			c.Logger().Debug("Mock config loaded: mock.StatusCode: ", mock.StatusCode, " mock.Content: ", mock.Content)
 		}
 	} else {
 		mock.Content = "Warning! Proxy Sink could not find the mock configuration file from : " + path + ". Details: " + err.Error()
 	}
-	w.WriteHeader(mock.StatuCode)
+	w.WriteHeader(mock.StatusCode)
 	w.Write([]byte(mock.Content))
 }
 
@@ -155,7 +157,7 @@ func sinkAndMockResponse(c moleculer.BrokerContext, w http.ResponseWriter, r *ht
 		w.Write([]byte("Error saving request. Error: " + record.Error().Error()))
 		return
 	}
-	respondWithMock(w, mockFolder, pathKey(path))
+	respondWithMock(c, w, mockFolder, pathKey(path))
 }
 
 //sinkAndProxy transparent proxy path

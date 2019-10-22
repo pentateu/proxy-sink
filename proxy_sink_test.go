@@ -31,7 +31,7 @@ var _ = Describe("ProxySink", func() {
 		rq.Header["Other-Header"] = []string{"some value"}
 		rs, err := http.DefaultClient.Do(rq)
 		Expect(err).Should(BeNil())
-		Expect(rs.Status).Should(Equal("200 OK"))
+		Expect(rs.Status).Should(Equal("201 Created"))
 		bts, err := ioutil.ReadAll(rs.Body)
 		str := string(bts)
 		fmt.Println("str ", str)
