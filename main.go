@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -85,15 +87,40 @@ func getCorrelationID(c moleculer.BrokerContext, headerField string, r *http.Req
 
 func pathKey(path string) string {
 	name := strings.Replace(path, "/", "_", -1)
-	name = name[1:] + ".mock"
-	return name
+	return name[1:]
+}
+
+// calcPaths calculates the possible paths for each mock file
+// example: folder_file_1234 -> ${id}_file_1234, folder_${id}_1234, folder_file_${id}
+func calcPaths(pathKey string) []string {
+	paths := []string{pathKey}
+	parts := strings.Split(pathKey, "_")
+	for i, _ := range parts {
+		parts[i] = "${id}"
+		paths = append(paths, strings.Join(parts, "_"))
+		parts = strings.Split(pathKey, "_")
+	}
+	return paths
+}
+
+// findFile for a given folder and path it will find a file that matchs the path considering id placeholders.
+func findFile(folder, path string) string {
+	paths := calcPaths(path)
+	for _, name := range paths {
+		file := folder + "/" + name + ".mock"
+		if _, err := os.Stat(file); err == nil {
+			return file
+		}
+	}
+	return "no file found for path: " + path
 }
 
 func respondWithMock(c moleculer.BrokerContext, w http.ResponseWriter, mockFolder, pathKey string) {
-	path := mockFolder + "/" + pathKey
+	path := findFile(mockFolder, pathKey)
 	mock := MockContent{StatusCode: 200, Content: "empty!"}
 	fileContents, err := ioutil.ReadFile(path)
 	if err == nil {
+		fmt.Println("Mock file being used: " + path)
 		err = json.Unmarshal(fileContents, &mock)
 		if err != nil {
 			mock.Content = "Error reading JSON mock file: " + path + ". Details: " + err.Error()

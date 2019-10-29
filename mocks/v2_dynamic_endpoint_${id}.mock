@@ -1,0 +1,4 @@
+{
+    "statusCode": 203,
+    "content": "I have a ${id} placeholder in my name :) which means I can math files like: v2_service_endpoint_1234 or v2_service_endpoint_someOtherId and etc"
+}
