@@ -115,7 +115,7 @@ func findFile(folder, path string) string {
 	return "no file found for path: " + path
 }
 
-func respondWithMock(c moleculer.BrokerContext, w http.ResponseWriter, mockFolder, pathKey string) {
+func getMockConfig(c moleculer.BrokerContext, w http.ResponseWriter, mockFolder, pathKey string) *MockContent {
 	path := findFile(mockFolder, pathKey)
 	mock := MockContent{StatusCode: 200, Content: "empty!"}
 	fileContents, err := ioutil.ReadFile(path)
@@ -130,8 +130,9 @@ func respondWithMock(c moleculer.BrokerContext, w http.ResponseWriter, mockFolde
 	} else {
 		mock.Content = "Warning! Proxy Sink could not find the mock configuration file from : " + path + ". Details: " + err.Error()
 	}
-	w.WriteHeader(mock.StatusCode)
-	w.Write([]byte(mock.Content))
+	// w.WriteHeader(mock.StatusCode)
+	// w.Write([]byte(mock.Content))
+	return &mock
 }
 
 func extractPayload(c moleculer.BrokerContext, r *http.Request) []byte {
@@ -166,9 +167,9 @@ func extractPayload(c moleculer.BrokerContext, r *http.Request) []byte {
 	return payload
 }
 
-// sinkAndMockResponse store the incoming request and reponse with a mock response
-func sinkAndMockResponse(c moleculer.BrokerContext, w http.ResponseWriter, r *http.Request, correlationID, mockFolder string) {
-	c.Logger().Debug("sinkAndMockResponse() - correlationID ", correlationID)
+// handleRequest store the incoming request, load mock config and return mock content or invoke real system.
+func handleRequest(c moleculer.BrokerContext, w http.ResponseWriter, r *http.Request, correlationID, mockFolder string) {
+	c.Logger().Debug("handleRequest() - correlationID ", correlationID)
 
 	payload := extractPayload(c, r)
 	path := r.URL.Path
@@ -184,12 +185,42 @@ func sinkAndMockResponse(c moleculer.BrokerContext, w http.ResponseWriter, r *ht
 		w.Write([]byte("Error saving request. Error: " + record.Error().Error()))
 		return
 	}
-	respondWithMock(c, w, mockFolder, pathKey(path))
+
+	mock := getMockConfig(c, w, mockFolder, pathKey(path))
+
+	if mock.TargetUrl != nil {
+		targetResponse := invokeTarget(c, r, mock)
+		//TODO write results here
+	} else {
+		w.WriteHeader(mock.StatusCode)
+		w.Write([]byte(mock.Content))
+	}
 }
 
 //sinkAndProxy transparent proxy path
-func sinkAndProxy(c moleculer.BrokerContext, w http.ResponseWriter, r *http.Request, correlationID string) {
-	//not required for now
+func invokeTarget(c moleculer.BrokerContext, r *http.Request, mock *MockContent) (status, content string) {
+	r.RequestURI = ""
+	r.URL.Host = endpoint.Host
+	r.URL.Scheme = endpoint.Scheme
+	r.Header.Set("X-Forwarded-Host", r.Header.Get("Host"))
+	r.Host = endpoint.Host
+
+	response, err = http.DefaultClient.Do(r)
+	if err != nil {
+		msg := fmt.Sprint("Error trying to call target endpoint! - Error: ", err)
+		c.Logger().Error(msg)
+
+	}
+
+	contents, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		// handle error here
+		msg := fmt.Sprint("Error trying to read body from the target endpoint! - Error: ", err)
+		c.Logger().Error(msg)
+		w.Write([]byte(msg))
+		return
+	}
+	return status, content
 }
 
 var proxySink = moleculer.ServiceSchema{
@@ -198,15 +229,11 @@ var proxySink = moleculer.ServiceSchema{
 		settings := payload.New(svc.Settings)
 		mode := settings.Get("mode").String()
 		port := settings.Get("port").Int()
-		correlationIdHeader := settings.Get("correlation-header").String()
+		correlationIDHeader := settings.Get("correlation-header").String()
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			correlationID := getCorrelationID(c, correlationIdHeader, r)
-			if mode == "sink" {
-				mocks := svc.Settings["mocks"].(string)
-				sinkAndMockResponse(c, w, r, correlationID, mocks)
-			} else {
-				sinkAndProxy(c, w, r, correlationID)
-			}
+			correlationID := getCorrelationID(c, correlationIDHeader, r)
+			mocks := svc.Settings["mocks"].(string)
+			handleRequest(c, w, r, correlationID, mocks)
 		})
 		go http.ListenAndServe(":"+strconv.Itoa(port), nil)
 		c.Logger().Info("Proxy Sink started - listening on port: "+strconv.Itoa(port)+" mode: ", mode, " correlationId Header: ", correlationIdHeader)
