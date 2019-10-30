@@ -88,8 +88,12 @@ func getCorrelationID(c moleculer.BrokerContext, headerField string, r *http.Req
 }
 
 func pathKey(path string) string {
-	name := strings.Replace(path, "/", "_", -1)
-	return name[1:]
+	path = strings.Replace(path, "/", "_", -1)
+	path = strings.Replace(path, ".", "_", -1)
+	if path[:1] == "_" {
+		return path[1:]
+	}
+	return path
 }
 
 // calcPaths calculates the possible paths for each mock file

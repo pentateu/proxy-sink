@@ -59,7 +59,7 @@ var _ = Describe("ProxySink", func() {
 
 	It("should respond with mock which has ${id} placeholder in the name", func(done Done) {
 		correlationId := "1234-dynamix"
-		rq, err := http.NewRequest("GET", "http://localhost:8387/v2/dynamic/endpoint_12121212", nil)
+		rq, err := http.NewRequest("GET", "http://localhost:8387/v2/dynamic/endpoint_12121212.xml", nil)
 		Expect(err).Should(BeNil())
 		rq.Header["Correlation-Id"] = []string{correlationId}
 		rq.Header["Other-Header"] = []string{"some value"}
@@ -78,7 +78,7 @@ var _ = Describe("ProxySink", func() {
 		bts, err = ioutil.ReadAll(rs.Body)
 		str = string(bts)
 		fmt.Println("str: ", str)
-		Expect(str).Should(Equal(`[{"correlationID":"` + correlationId + `","headers":"map[Accept-Encoding:[gzip] Correlation-Id:[` + correlationId + `] Other-Header:[some value] User-Agent:[Go-http-client/1.1]]","id":"2","path":"/v2/dynamic/endpoint_12121212","payload":null}]`))
+		Expect(str).Should(Equal(`[{"correlationID":"` + correlationId + `","headers":"map[Accept-Encoding:[gzip] Correlation-Id:[` + correlationId + `] Other-Header:[some value] User-Agent:[Go-http-client/1.1]]","id":"2","path":"/v2/dynamic/endpoint_12121212.xml","payload":null}]`))
 
 		close(done)
 	}, 2)
@@ -92,13 +92,21 @@ var _ = Describe("ProxySink", func() {
 		Expect(paths).Should(ContainElement("folder_file_${id}"))
 	})
 
+	It("pathKey should transform pach into a snake case file name", func() {
+		path := "/v2/dynamic/FileName_1234.xml"
+		path = pathKey(path)
+		Expect(path).Should(Equal("v2_dynamic_FileName_1234_xml"))
+
+		path = "v2/dynamic/FileName_1234.xml"
+		path = pathKey(path)
+		Expect(path).Should(Equal("v2_dynamic_FileName_1234_xml"))
+	})
+
 	It("findFile file with dynamic id", func() {
-		//folder, _ := filepath.Abs(filepath.Dir(os.Args[0]))
-		//fmt.Println("folder: ", folder)
 		folder := "./mocks"
-		path := "v2_dynamic_endpoint_1234"
+		path := "v2_dynamic_endpoint_1234_xml"
 		file := findFile(folder, path)
-		Expect(file).Should(HaveSuffix("v2_dynamic_endpoint_${id}.mock"))
+		Expect(file).Should(HaveSuffix("v2_dynamic_endpoint_${id}_xml.mock"))
 
 		path = "v2_dynamic_1234_bla"
 		file = findFile(folder, path)
