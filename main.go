@@ -8,6 +8,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -63,6 +64,7 @@ var sink = moleculer.ServiceSchema{
 type MockContent struct {
 	StatusCode int
 	Content    string
+	TargetUrl  string
 }
 
 func getCorrelationID(c moleculer.BrokerContext, headerField string, r *http.Request) string {
@@ -188,8 +190,10 @@ func handleRequest(c moleculer.BrokerContext, w http.ResponseWriter, r *http.Req
 
 	mock := getMockConfig(c, w, mockFolder, pathKey(path))
 
-	if mock.TargetUrl != nil {
-		targetResponse := invokeTarget(c, r, mock)
+	if mock.TargetUrl != "" {
+		status, content := invokeTarget(c, r, mock)
+		w.WriteHeader(status)
+		w.Write(content)
 		//TODO write results here
 	} else {
 		w.WriteHeader(mock.StatusCode)
@@ -198,29 +202,38 @@ func handleRequest(c moleculer.BrokerContext, w http.ResponseWriter, r *http.Req
 }
 
 //sinkAndProxy transparent proxy path
-func invokeTarget(c moleculer.BrokerContext, r *http.Request, mock *MockContent) (status, content string) {
+func invokeTarget(c moleculer.BrokerContext, r *http.Request, mock *MockContent) (statusCode int, content []byte) {
+	endpoint, err := url.Parse(mock.TargetUrl)
+	if err != nil {
+		c.Logger().Error("Could not parse target Endpoint: ", mock.TargetUrl)
+	}
+
 	r.RequestURI = ""
 	r.URL.Host = endpoint.Host
 	r.URL.Scheme = endpoint.Scheme
 	r.Header.Set("X-Forwarded-Host", r.Header.Get("Host"))
 	r.Host = endpoint.Host
 
-	response, err = http.DefaultClient.Do(r)
+	response, err := http.DefaultClient.Do(r)
 	if err != nil {
 		msg := fmt.Sprint("Error trying to call target endpoint! - Error: ", err)
-		c.Logger().Error(msg)
-
+		c.Logger().Error(content)
+		statusCode = response.StatusCode
+		content = []byte(msg)
 	}
 
-	contents, err := ioutil.ReadAll(response.Body)
+	targetContents, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		// handle error here
 		msg := fmt.Sprint("Error trying to read body from the target endpoint! - Error: ", err)
-		c.Logger().Error(msg)
-		w.Write([]byte(msg))
-		return
+		c.Logger().Error(content)
+		statusCode = 500
+		content = []byte(msg)
+	} else {
+		content = targetContents
+		statusCode = response.StatusCode
 	}
-	return status, content
+	return statusCode, content
 }
 
 var proxySink = moleculer.ServiceSchema{
@@ -236,7 +249,7 @@ var proxySink = moleculer.ServiceSchema{
 			handleRequest(c, w, r, correlationID, mocks)
 		})
 		go http.ListenAndServe(":"+strconv.Itoa(port), nil)
-		c.Logger().Info("Proxy Sink started - listening on port: "+strconv.Itoa(port)+" mode: ", mode, " correlationId Header: ", correlationIdHeader)
+		c.Logger().Info("Proxy Sink started - listening on port: "+strconv.Itoa(port)+" mode: ", mode, " correlationId Header: ", correlationIDHeader)
 	},
 }
 
